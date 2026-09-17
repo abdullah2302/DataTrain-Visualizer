@@ -66,8 +66,11 @@ def train_model():
         if y.dtype == 'object' or not np.issubdtype(y.dtype, np.number):
             y = pd.to_numeric(y, errors='coerce').fillna(0)  # Convert y to numeric, fill NaN with 0
 
-        # Split into training and testing
-        X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=train_ratio, random_state=42)
+        # Split into training and testing, while preserving original row indices for graph X-axis
+        sample_indices = np.arange(len(X))
+        X_train, X_test, y_train, y_test, train_indices, test_indices = train_test_split(
+            X, y, sample_indices, train_size=train_ratio, random_state=42
+        )
 
         # Standardize data for SVM and K-Means
         scaler = StandardScaler()
@@ -109,26 +112,17 @@ def train_model():
         train_predictions = np.nan_to_num(train_predictions, nan=0)
         test_predictions = np.nan_to_num(test_predictions, nan=0)
 
-        # Extract X-axis data (use first column if available, else use indices)
-        def get_x_data(df_or_array):
-            if isinstance(df_or_array, pd.DataFrame):
-                if df_or_array.shape[1] > 0:
-                    return df_or_array.iloc[:, 0].tolist()  # Use first column if DataFrame
-                return [i for i in range(len(df_or_array))]  # Use indices if no columns
-            elif isinstance(df_or_array, np.ndarray):
-                if df_or_array.shape[1] > 0:
-                    return df_or_array[:, 0].tolist()  # Use first column if NumPy array
-                return [i for i in range(len(df_or_array))]  # Use indices if no columns
-            return [i for i in range(len(df_or_array))]  # Fallback to indices
+        def to_serializable_list(values):
+            return np.asarray(values).tolist()
 
         # Prepare response with train and test data
         result = {
-            'train_predictions': train_predictions.tolist(),
-            'train_x_data': get_x_data(X_train),
-            'train_y_data': y_train.tolist(),
-            'test_predictions': test_predictions.tolist(),
-            'test_x_data': get_x_data(X_test),
-            'test_y_data': y_test.tolist(),
+            'train_predictions': to_serializable_list(train_predictions),
+            'train_x_data': to_serializable_list(train_indices),
+            'train_y_data': to_serializable_list(y_train),
+            'test_predictions': to_serializable_list(test_predictions),
+            'test_x_data': to_serializable_list(test_indices),
+            'test_y_data': to_serializable_list(y_test),
             'graph_type': graph_type
         }
         return jsonify(result)
